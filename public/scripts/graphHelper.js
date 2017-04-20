@@ -13,7 +13,7 @@
             // Initialize the auth request.
             clientApplication = createApplication(APPLICATION_CONFIG, function ()
             {
-                localStorage.user = clientApplication.user;
+                // localStorage.user = clientApplication.user;
                 callWebApi(APPLICATION_CONFIG.graphScopes, function (token, error)
                 {
                     if (error == null) {
@@ -34,7 +34,7 @@
                 },
                 logout: function logout() {
                     clientApplication.logout();
-                    delete localStorage.auth;
+                    delete localStorage.token;
                     delete localStorage.user;
                 },
 

@@ -31,7 +31,7 @@
     function initAuth() {
 
       // Check initial connection status.
-      if (localStorage.auth) {
+      if (localStorage.token) {
           processAuth();
       } else {
           let auth = null; // hello('aad').getAuthResponse();
@@ -44,15 +44,10 @@
 
     // Auth info is saved in localStorage by now, so set the default headers and user properties.
     function processAuth() {
-        let auth = angular.fromJson(localStorage.auth); 
-
-        // Check token expiry. If the token is valid for another 5 minutes, we'll use it.       
-        let expiration = new Date();
-        expiration.setTime((auth.expires - 300) * 1000); 
-        if (expiration > new Date()) {
+        let auth = angular.fromJson(localStorage.token); 
 
           // Add the required Authorization header with bearer token.
-          $http.defaults.headers.common.Authorization = 'Bearer ' + auth.access_token;
+          $http.defaults.headers.common.Authorization = 'Bearer ' + auth;
           
           // This header has been added to identify our sample in the Microsoft Graph service. If extracting this code for your project please remove.
           $http.defaults.headers.common.SampleID = 'angular-connect-rest-sample';
@@ -75,7 +70,7 @@
             vm.displayName = user.displayName;
             vm.emailAddress = user.mail || user.userPrincipalName;
           }
-       }
+
     }
 
     vm.initAuth();    
@@ -96,10 +91,8 @@
     function sendMail() {
 
       // Check token expiry. If the token is valid for another 5 minutes, we'll use it.
-      let auth = angular.fromJson(localStorage.auth);       
-      let expiration = new Date();
-      expiration.setTime((auth.expires - 300) * 1000); 
-      if (expiration > new Date()) {
+      let auth = angular.fromJson(localStorage.token);       
+      if (true) {
         
         // Build the HTTP request payload (the Message object).
         var email = {
