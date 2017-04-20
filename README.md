@@ -22,8 +22,6 @@ This sample shows how to connect an Angular app to a Microsoft work or school (A
 To use the Microsoft Graph Connect sample for Angular, you need the following:
 * [Node.js](https://nodejs.org/). Node is required to run the sample on a development server and to install dependencies. 
 
-* [Bower](https://bower.io). Bower is required to install front-end dependencies.
-
 * Either a [Microsoft account](https://www.outlook.com) or [Office 365 for business account](https://msdn.microsoft.com/en-us/office/office365/howto/setup-development-environment#bk_Office365Account)
 
 ## Register the application
@@ -59,7 +57,6 @@ To use the Microsoft Graph Connect sample for Angular, you need the following:
 
   ```
 npm install
-bower install hello
   ```
   
 5. Run `npm start` to start the development server.
