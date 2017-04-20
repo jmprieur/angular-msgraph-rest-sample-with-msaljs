@@ -34,7 +34,7 @@
       if (localStorage.auth) {
           processAuth();
       } else {
-        let auth = hello('aad').getAuthResponse();
+          let auth = null; // hello('aad').getAuthResponse();
         if (auth !== null) {
           localStorage.auth = angular.toJson(auth);
           processAuth();
