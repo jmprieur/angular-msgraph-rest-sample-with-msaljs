@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "Angular-OneDrive-Rest-Sample", "Angular-OneDrive-Rest-Sample.njsproj", "{3917C73E-9A4E-4935-801E-9020795A84B3}"
+Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "Angular-MSGraph-Rest-Sample-with-msal", "Angular-MSGraph-Rest-Sample-with-msal.njsproj", "{3917C73E-9A4E-4935-801E-9020795A84B3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

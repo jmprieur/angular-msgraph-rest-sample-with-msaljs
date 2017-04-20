@@ -14,14 +14,14 @@
             clientApplication = createApplication(APPLICATION_CONFIG, function ()
             {
                 // localStorage.user = clientApplication.user;
-                callWebApi(APPLICATION_CONFIG.graphScopes, function (token, error)
+                getAccessToken(APPLICATION_CONFIG.graphScopes, function (token, error)
                 {
-                    if (error == null) {
+                    if (token) {
                         localStorage.token = angular.toJson(token);
 
-                        // Add the required Authorization header with bearer token.
-//                        $http.defaults.headers.common.Authorization = 'Bearer ' + token;
-
+                        // refreshes the page as with msal, the authentication happened in an HTML dialog, 
+                        // whereas it happened in the window itself with hello.js
+                        location = location;
                     }
                 });
             });

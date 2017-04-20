@@ -17,7 +17,7 @@ function createApplication(config, authCallback) {
 var clientApplication;
 
 
-function callWebApi(scope, callback) {
+function getAccessToken(scope, callback) {
     clientApplication.acquireTokenSilent(scope, function callBackendApiCallback(errorDescription, token, error) {
         if (error) {
             clientApplication.interactionMode = APPLICATION_CONFIG.interactionMode;
