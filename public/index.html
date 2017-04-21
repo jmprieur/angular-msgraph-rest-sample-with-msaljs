@@ -5,31 +5,31 @@
 <html ng-app="app">
 
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Microsoft Graph Connect sample</title>
-  <base href="/">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Microsoft Graph Connect sample</title>
+    <base href="/">
 
-  <!-- Third party dependencies. -->
-  <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.css">
-  <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.components.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.3/angular.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.3/angular-route.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.8.0/loading-bar.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.8.0/loading-bar.css">
+    <!-- Third party dependencies. -->
+    <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.css">
+    <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.components.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.3/angular.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.3/angular-route.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.8.0/loading-bar.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.8.0/loading-bar.css">
 
-  <!-- App code. -->
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/app.js"></script>
     <script src="/scripts/msal.js"></script>
-    <script src="/scripts/AuthenticationHandler.js"></script>
-  <script src="/scripts/graphHelper.js"></script>
-  <script src="/controllers/mainController.js"></script>  
-  <link rel="stylesheet" href="styles.css">
+
+    <!-- App code. -->
+    <script src="/scripts/app.js"></script>
+    <script src="/scripts/config.js"></script>
+    <script src="/services/AuthenticationHandler.js"></script>
+    <script src="/scripts/graphHelper.js"></script>
+    <script src="/controllers/mainController.js"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body class="ms-Grid">
-  <div ng-controller="MainController as main" ng-include="'views/main.html'"></div>
+    <div ng-controller="MainController as main" ng-include="'views/main.html'"></div>
 </body>
-
 </html>
