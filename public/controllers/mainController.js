@@ -8,7 +8,7 @@
         .module('app')
         .controller('MainController', MainController);
 
-    function MainController($http, $log, $window, GraphHelper, authenticationHandler) {
+    function MainController($http, $log, $window, GraphHelper) {
         let vm = this;
 
         // View model properties
@@ -29,7 +29,7 @@
         // End of exposed properties and methods.
 
         function initAuth() {
-            vm.isAuthenticated = authenticationHandler.isAuthenticated();
+            vm.isAuthenticated = GraphHelper.isAuthenticated();
 
             if (vm.isAuthenticated) {
                 return getUserData();
