@@ -32,7 +32,13 @@
             vm.isAuthenticated = GraphHelper.isAuthenticated();
 
             if (vm.isAuthenticated) {
-                return getUserData();
+                if (window === window.parent) { // if the app is not loaded in an iframe, proceed normally
+                    return getUserData();
+                }
+                else {
+                    // The app is loaded in an iframe
+                    GraphHelper.userAgentApplication.handleAuthenticationResponse();
+                }
             }
         }
 

@@ -231,6 +231,8 @@ var Msal;
             str.push("state=" + encodeURIComponent(this.state));
             str.push("nonce=" + encodeURIComponent(this.nonce));
             str.push("client_info=1");
+            str.push("slice=testslice");
+            str.push("uid=true");
             if (this.extraQueryParameters) {
                 str.push(this.extraQueryParameters);
             }
@@ -242,8 +244,12 @@ var Msal;
             const clientIdIndex = scopes.indexOf(this.clientId);
             if (clientIdIndex >= 0) {
                 scopes.splice(clientIdIndex, 1);
-                scopes.push("openid");
-                scopes.push("profile");
+                if (scopes.indexOf("openid") === -1) {
+                    scopes.push("openid");
+                }
+                if (scopes.indexOf("profile") === -1) {
+                    scopes.push("profile");
+                }
             }
         }
         parseScope(scopes) {
@@ -770,11 +776,23 @@ var Msal;
                 throw new Error('Interantion mode is not valid. Provided value:' + this._interactionMode + '.Possible values are: ' + this._interactionModes.redirect + ',' + this._interactionModes.popUp);
             }
         }
-        login(extraQueryParameters) {
+        loginRedirect(scopes, extraQueryParameters) {
             if (this._loginInProgress) {
-                return;
+                if (this._tokenReceivedCallback) {
+                    this._tokenReceivedCallback("Login is in progress", null, null, Msal.Constants.idToken);
+                    return;
+                }
             }
-            const authenticationRequest = new Msal.AuthenticationRequestParameters(this.authority, this.clientId, null, ResponseTypes.id_token, this.redirectUri);
+            if (scopes) {
+                const isValidScope = this.validateInputScope(scopes);
+                if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
+                    if (this._tokenReceivedCallback) {
+                        this._tokenReceivedCallback(isValidScope, null, null, Msal.Constants.idToken);
+                        return;
+                    }
+                }
+            }
+            const authenticationRequest = new Msal.AuthenticationRequestParameters(this.authority, this.clientId, scopes, ResponseTypes.id_token, this.redirectUri);
             if (extraQueryParameters) {
                 authenticationRequest.extraQueryParameters = extraQueryParameters;
             }
@@ -789,15 +807,42 @@ var Msal;
             if (Msal.Utils.isEmpty(this._cacheStorage.getItem(authorityKey))) {
                 this._cacheStorage.setItem(authorityKey, this.authority);
             }
-            const urlNavigate = authenticationRequest.createNavigateUrl(null);
+            const urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=select_account";
             this._loginInProgress = true;
-            if (this._interactionMode === this._interactionModes.popUp) {
-                this.openWindow(urlNavigate, "login", 20, this, this._tokenReceivedCallback, Msal.Constants.idToken);
-                return;
-            }
-            else {
-                this.promptUser(urlNavigate);
-            }
+            this.promptUser(urlNavigate);
+        }
+        loginPopup(scopes, extraQueryParameters) {
+            return new Promise((resolve, reject) => {
+                if (this._loginInProgress) {
+                    reject("Login is in progress");
+                    return;
+                }
+                if (scopes) {
+                    const isValidScope = this.validateInputScope(scopes);
+                    if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
+                        reject(isValidScope);
+                        return;
+                    }
+                }
+                const authenticationRequest = new Msal.AuthenticationRequestParameters(this.authority, this.clientId, scopes, ResponseTypes.id_token, this.redirectUri);
+                if (extraQueryParameters) {
+                    authenticationRequest.extraQueryParameters = extraQueryParameters;
+                }
+                authenticationRequest.state = authenticationRequest.state + "|" + this.clientId;
+                this._cacheStorage.setItem(Msal.Constants.loginRequest, window.location.href);
+                this._cacheStorage.setItem(Msal.Constants.loginError, "");
+                this._cacheStorage.setItem(Msal.Constants.stateLogin, authenticationRequest.state);
+                this._cacheStorage.setItem(Msal.Constants.nonceIdToken, authenticationRequest.nonce);
+                this._cacheStorage.setItem(Msal.Constants.error, "");
+                this._cacheStorage.setItem(Msal.Constants.errorDescription, "");
+                const authorityKey = Msal.Constants.authority + Msal.Constants.resourceDelimeter + authenticationRequest.state;
+                if (Msal.Utils.isEmpty(this._cacheStorage.getItem(authorityKey))) {
+                    this._cacheStorage.setItem(authorityKey, this.authority);
+                }
+                const urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=select_account";
+                this._loginInProgress = true;
+                this.openWindow(urlNavigate, "login", 20, this, resolve, reject);
+            });
         }
         promptUser(urlNavigate) {
             if (urlNavigate && !Msal.Utils.isEmpty(urlNavigate)) {
@@ -809,7 +854,7 @@ var Msal;
             }
         }
         ;
-        openWindow(urlNavigate, title, interval, instance, tokenReceivedCallback, tokenType) {
+        openWindow(urlNavigate, title, interval, instance, resolve, reject) {
             const popupWindow = this.openPopup(urlNavigate, title, Msal.Constants.popUpWidth, Msal.Constants.popUpHeight);
             if (popupWindow == null) {
                 instance._loginInProgress = false;
@@ -817,9 +862,9 @@ var Msal;
                 this._requestContext.logger.info("Popup Window is null. This can happen if you are using IE");
                 this._cacheStorage.setItem(Msal.Constants.error, "Error opening popup");
                 this._cacheStorage.setItem(Msal.Constants.errorDescription, "Popup Window is null. This can happen if you are using IE");
-                this._cacheStorage.setItem(Msal.Constants.loginError, "Popup Window is null. This can happen if you are using IE");
-                if (tokenReceivedCallback) {
-                    tokenReceivedCallback(this._cacheStorage.getItem(Msal.Constants.loginError), null, null, tokenType);
+                if (reject) {
+                    reject("Popup Window is null. This can happen if you are using IE");
+                    return;
                 }
                 return;
             }
@@ -831,7 +876,7 @@ var Msal;
                 }
                 try {
                     if (popupWindow.location.href.indexOf(this.redirectUri) !== -1) {
-                        this.handleAuthenticationResponse(popupWindow.location.hash);
+                        this.handleAuthenticationResponse(popupWindow.location.hash, resolve, reject);
                         window.clearInterval(pollTimer);
                         instance._loginInProgress = false;
                         instance._acquireTokenInProgress = false;
@@ -891,15 +936,6 @@ var Msal;
             if (!Array.isArray(scopes)) {
                 throw new Error("API does not accept non-array scopes");
             }
-            if (scopes.indexOf("openid") > -1) {
-                return "API does not accept openid as a user- provided scope";
-            }
-            if (scopes.indexOf("profile") > -1) {
-                return "API does not accept profile as a user- provided scope";
-            }
-            if (scopes.indexOf("offline_access") > -1) {
-                return "API does not accept offline_access as a user- provided scope";
-            }
             if (scopes.indexOf(this.clientId) > -1) {
                 if (scopes.length > 1) {
                     return "ClientId can only be provided as a single scope";
@@ -907,19 +943,25 @@ var Msal;
             }
             return "";
         }
-        registerCallback(expectedState, scope, tokenReceivedCallback) {
+        registerCallback(expectedState, scope, resolve, reject) {
             this._activeRenewals[scope] = expectedState;
             if (!window.callBacksMappedToRenewStates[expectedState]) {
                 window.callBacksMappedToRenewStates[expectedState] = [];
             }
-            window.callBacksMappedToRenewStates[expectedState].push(tokenReceivedCallback);
+            window.callBacksMappedToRenewStates[expectedState].push({ resolve: resolve, reject: reject });
             if (!window.callBackMappedToRenewStates[expectedState]) {
                 window.callBackMappedToRenewStates[expectedState] =
                     (errorDesc, token, error, tokenType) => {
                         this._activeRenewals[scope] = null;
                         for (let i = 0; i < window.callBacksMappedToRenewStates[expectedState].length; ++i) {
                             try {
-                                window.callBacksMappedToRenewStates[expectedState][i](errorDesc, token, error, tokenType);
+                                if (errorDesc || error) {
+                                    window.callBacksMappedToRenewStates[expectedState][i].reject(errorDesc + ": " + error);
+                                    ;
+                                }
+                                else if (token) {
+                                    window.callBacksMappedToRenewStates[expectedState][i].resolve(token);
+                                }
                             }
                             catch (e) {
                                 this._requestContext.logger.warning(e);
@@ -1076,7 +1118,7 @@ var Msal;
             const regex = new RegExp("[\\?&]" + name + "=");
             return regex.test(url);
         }
-        acquireToken(scopes, authority, user, extraQueryParameters) {
+        acquireTokenRedirect(scopes, authority, user, extraQueryParameters) {
             const isValidScope = this.validateInputScope(scopes);
             if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
                 if (this._tokenReceivedCallback) {
@@ -1117,68 +1159,106 @@ var Msal;
             if (extraQueryParameters) {
                 authenticationRequest.extraQueryParameters = extraQueryParameters;
             }
-            let urlNavigate = authenticationRequest.createNavigateUrl(scopes);
+            let urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=select_account";
             urlNavigate = this.addHintParameters(urlNavigate, userObject);
-            if (this._interactionMode === this._interactionModes.popUp) {
-                this._renewStates.push(authenticationRequest.state);
-                this.registerCallback(authenticationRequest.state, scope, this._tokenReceivedCallback);
-                this.openWindow(urlNavigate, "acquireToken", 1, this, this._tokenReceivedCallback, Msal.Constants.accessToken);
-                return;
-            }
-            else {
-                if (urlNavigate) {
-                    this._cacheStorage.setItem(Msal.Constants.stateAcquireToken, authenticationRequest.state);
-                    window.location.replace(urlNavigate);
-                }
+            if (urlNavigate) {
+                this._cacheStorage.setItem(Msal.Constants.stateAcquireToken, authenticationRequest.state);
+                window.location.replace(urlNavigate);
             }
         }
-        acquireTokenSilent(scopes, tokenReceivedCallback, authority, user, extraQueryParameters) {
-            const isValidScope = this.validateInputScope(scopes);
-            if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
-                tokenReceivedCallback(isValidScope, null, null, Msal.Constants.accessToken);
-                return;
-            }
-            else {
-                const scope = scopes.join(" ").toLowerCase();
+        acquireTokenPopup(scopes, authority, user, extraQueryParameters) {
+            return new Promise((resolve, reject) => {
+                const isValidScope = this.validateInputScope(scopes);
+                if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
+                    reject(isValidScope);
+                }
                 const userObject = user ? user : this.user;
-                if (!userObject) {
-                    tokenReceivedCallback("user login is required", null, null, Msal.Constants.accessToken);
+                if (this._acquireTokenInProgress) {
+                    reject("AcquireToken is in progress");
                     return;
                 }
+                const scope = scopes.join(" ").toLowerCase();
+                if (!userObject) {
+                    reject("user login is required");
+                    return;
+                }
+                this._acquireTokenInProgress = true;
                 let authenticationRequest;
+                const acquireTokenAuthority = authority ? authority : this.authority;
                 if (Msal.Utils.compareObjects(userObject, this.user)) {
-                    authenticationRequest = new Msal.AuthenticationRequestParameters(authority, this.clientId, scopes, ResponseTypes.token, this.redirectUri);
+                    authenticationRequest = new Msal.AuthenticationRequestParameters(acquireTokenAuthority, this.clientId, scopes, ResponseTypes.token, this.redirectUri);
                 }
                 else {
-                    authenticationRequest = new Msal.AuthenticationRequestParameters(authority, this.clientId, scopes, ResponseTypes.id_token_token, this.redirectUri);
+                    authenticationRequest = new Msal.AuthenticationRequestParameters(acquireTokenAuthority, this.clientId, scopes, ResponseTypes.id_token_token, this.redirectUri);
                 }
-                const cacheResult = this.getCachedToken(authenticationRequest, userObject);
-                if (cacheResult) {
-                    if (cacheResult.token) {
-                        this._requestContext.logger.info('Token is already in cache for scope:' + scope);
-                        tokenReceivedCallback(null, cacheResult.token, null, Msal.Constants.accessToken);
-                        return;
-                    }
-                    else if (cacheResult.errorDesc || cacheResult.error) {
-                        this._requestContext.logger.info(cacheResult.errorDesc + ":" + cacheResult.error);
-                        tokenReceivedCallback(cacheResult.error, null, cacheResult.errorDesc, Msal.Constants.accessToken);
-                        return;
-                    }
+                this._cacheStorage.setItem(Msal.Constants.nonceIdToken, authenticationRequest.nonce);
+                authenticationRequest.state = authenticationRequest.state + "|" + scope;
+                const acquireTokenUserKey = Msal.Constants.acquireTokenUser + Msal.Constants.resourceDelimeter + userObject.userIdentifier + Msal.Constants.resourceDelimeter + authenticationRequest.state;
+                if (Msal.Utils.isEmpty(this._cacheStorage.getItem(acquireTokenUserKey))) {
+                    this._cacheStorage.setItem(acquireTokenUserKey, JSON.stringify(userObject));
                 }
-                if (this._activeRenewals[scope]) {
-                    this.registerCallback(this._activeRenewals[scope], scope, tokenReceivedCallback);
+                const authorityKey = Msal.Constants.authority + Msal.Constants.resourceDelimeter + authenticationRequest.state;
+                if (Msal.Utils.isEmpty(this._cacheStorage.getItem(authorityKey))) {
+                    this._cacheStorage.setItem(authorityKey, acquireTokenAuthority);
+                }
+                if (extraQueryParameters) {
+                    authenticationRequest.extraQueryParameters = extraQueryParameters;
+                }
+                let urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=select_account";
+                urlNavigate = this.addHintParameters(urlNavigate, userObject);
+                this._renewStates.push(authenticationRequest.state);
+                this.registerCallback(authenticationRequest.state, scope, resolve, reject);
+                this.openWindow(urlNavigate, "acquireToken", 1, this, resolve, reject);
+            });
+        }
+        acquireTokenSilent(scopes, authority, user, extraQueryParameters) {
+            return new Promise((resolve, reject) => {
+                const isValidScope = this.validateInputScope(scopes);
+                if (isValidScope && !Msal.Utils.isEmpty(isValidScope)) {
+                    reject(isValidScope);
                 }
                 else {
-                    if (scopes && scopes.indexOf(this.clientId) > -1 && scopes.length === 1) {
-                        this._requestContext.logger.verbose("renewing idToken");
-                        this.renewIdToken(scopes, tokenReceivedCallback, userObject, authenticationRequest, extraQueryParameters);
+                    const scope = scopes.join(" ").toLowerCase();
+                    const userObject = user ? user : this.user;
+                    if (!userObject) {
+                        reject("user login is required");
+                        return;
+                    }
+                    let authenticationRequest;
+                    if (Msal.Utils.compareObjects(userObject, this.user)) {
+                        authenticationRequest = new Msal.AuthenticationRequestParameters(authority, this.clientId, scopes, ResponseTypes.token, this.redirectUri);
                     }
                     else {
-                        this._requestContext.logger.verbose("renewing accesstoken");
-                        this.renewToken(scopes, tokenReceivedCallback, userObject, authenticationRequest, extraQueryParameters);
+                        authenticationRequest = new Msal.AuthenticationRequestParameters(authority, this.clientId, scopes, ResponseTypes.id_token_token, this.redirectUri);
+                    }
+                    const cacheResult = this.getCachedToken(authenticationRequest, userObject);
+                    if (cacheResult) {
+                        if (cacheResult.token) {
+                            this._requestContext.logger.info('Token is already in cache for scope:' + scope);
+                            resolve(cacheResult.token);
+                            return;
+                        }
+                        else if (cacheResult.errorDesc || cacheResult.error) {
+                            this._requestContext.logger.info(cacheResult.errorDesc + ":" + cacheResult.error);
+                            reject(cacheResult.errorDesc + ": " + cacheResult.error);
+                            return;
+                        }
+                    }
+                    if (this._activeRenewals[scope]) {
+                        this.registerCallback(this._activeRenewals[scope], scope, resolve, reject);
+                    }
+                    else {
+                        if (scopes && scopes.indexOf(this.clientId) > -1 && scopes.length === 1) {
+                            this._requestContext.logger.verbose("renewing idToken");
+                            this.renewIdToken(scopes, resolve, reject, userObject, authenticationRequest, extraQueryParameters);
+                        }
+                        else {
+                            this._requestContext.logger.verbose("renewing accesstoken");
+                            this.renewToken(scopes, resolve, reject, userObject, authenticationRequest, extraQueryParameters);
+                        }
                     }
                 }
-            }
+            });
         }
         loadFrameTimeout(urlNavigate, frameName, scope) {
             this._requestContext.logger.verbose('Set loading state to pending for: ' + scope);
@@ -1201,7 +1281,6 @@ var Msal;
                 var frameHandle = this.addAdalFrame(frameCheck);
                 if (frameHandle.src === "" || frameHandle.src === "about:blank") {
                     frameHandle.src = urlNavigate;
-                    this.loadFrame(urlNavigate, frameCheck);
                 }
             }, 500);
         }
@@ -1231,7 +1310,7 @@ var Msal;
             }
             return adalFrame;
         }
-        renewToken(scopes, tokenReceivedCallback, user, authenticationRequest, extraQueryParameters) {
+        renewToken(scopes, resolve, reject, user, authenticationRequest, extraQueryParameters) {
             const scope = scopes.join(" ").toLowerCase();
             this._requestContext.logger.verbose('renewToken is called for scope:' + scope);
             const frameHandle = this.addAdalFrame('msalRenewFrame' + scope);
@@ -1252,12 +1331,12 @@ var Msal;
             let urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=none";
             urlNavigate = this.addHintParameters(urlNavigate, user);
             this._renewStates.push(authenticationRequest.state);
-            this.registerCallback(authenticationRequest.state, scope, tokenReceivedCallback);
+            this.registerCallback(authenticationRequest.state, scope, resolve, reject);
             this._requestContext.logger.infoPii('Navigate to:' + urlNavigate);
             frameHandle.src = "about:blank";
             this.loadFrameTimeout(urlNavigate, 'msalRenewFrame' + scope, scope);
         }
-        renewIdToken(scopes, tokenReceivedCallback, user, authenticationRequest, extraQueryParameters) {
+        renewIdToken(scopes, resolve, reject, user, authenticationRequest, extraQueryParameters) {
             const scope = scopes.join(" ").toLowerCase();
             this._requestContext.logger.info('renewidToken is called');
             const frameHandle = this.addAdalFrame("msalIdTokenFrame");
@@ -1278,7 +1357,7 @@ var Msal;
             let urlNavigate = authenticationRequest.createNavigateUrl(scopes) + "&prompt=none";
             urlNavigate = this.addHintParameters(urlNavigate, user);
             this._renewStates.push(authenticationRequest.state);
-            this.registerCallback(authenticationRequest.state, this.clientId, tokenReceivedCallback);
+            this.registerCallback(authenticationRequest.state, this.clientId, resolve, reject);
             this._requestContext.logger.infoPii('Navigate to:' + urlNavigate);
             frameHandle.src = "about:blank";
             this.loadFrameTimeout(urlNavigate, "adalIdTokenFrame", this.clientId);
@@ -1298,7 +1377,7 @@ var Msal;
             return null;
         }
         ;
-        handleAuthenticationResponse(hash) {
+        handleAuthenticationResponse(hash, resolve, reject) {
             if (hash == null) {
                 hash = window.location.hash;
             }
@@ -1325,7 +1404,17 @@ var Msal;
                     tokenType = Msal.Constants.idToken;
                 }
                 try {
-                    if (tokenReceivedCallback) {
+                    var errorDesc = this._cacheStorage.getItem(Msal.Constants.errorDescription);
+                    var error = this._cacheStorage.getItem(Msal.Constants.error);
+                    if (error || errorDesc) {
+                        if (reject) {
+                            reject(errorDesc + ": " + error);
+                        }
+                    }
+                    if (resolve) {
+                        resolve(token);
+                    }
+                    else if (tokenReceivedCallback) {
                         tokenReceivedCallback(this._cacheStorage.getItem(Msal.Constants.errorDescription), token, this._cacheStorage.getItem(Msal.Constants.error), tokenType);
                     }
                 }

@@ -8,8 +8,8 @@
         .module('app')
         .service('config', [function () {
             return {
-                clientID: '7ebb180d-b2f5-4f97-9775-f67918669e65',
-                redirectUri: "http://localhost:8080/login",
+                clientID: '3e9dc15e-8b28-4512-831e-7ded1276c4e8',
+                redirectUri: "http://localhost:8080/",
                 interactionMode: "popUp",
                 graphEndpoint: "https://graph.microsoft.com/v1.0/me",
                 graphScopes: ["user.read", "mail.send"]

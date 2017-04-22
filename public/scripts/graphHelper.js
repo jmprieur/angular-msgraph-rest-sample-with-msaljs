@@ -25,10 +25,10 @@
                 },
                 // Sign in the user and get user profile
                 login: function login() {
-                    return this.userAgentApplication.loginPopup("slice=testslice&uid=true", config.graphScopes)
+                    return this.userAgentApplication.loginPopup(config.graphScopes)
                         .then(function (idToken) {
                             return this.userAgentApplication.acquireTokenSilent(config.graphScopes);
-                        })
+                        }.bind(this))
                         .then(this.meInternal.bind(this));
                 },
                 logout: function logout() {
