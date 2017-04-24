@@ -51,6 +51,7 @@
         function updateUser(user) {
             vm.displayName = user.displayName;
             vm.emailAddress = user.mail || user.userPrincipalName;
+            vm.isAuthenticated = true;
         }
 
         vm.initAuth();
