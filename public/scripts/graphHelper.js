@@ -8,15 +8,31 @@
 (function () {
     angular
         .module('app')
-        .service('GraphHelper', ['$http', 'authenticationHandler', 'config', function ($http, authenticationHandler, config) {
-            return {
-                // Sign in and sign out the user.
+        .service('GraphHelper', ['$http', 'config', function ($http, config) {
+            var factory = {
+                _userAgentApplication: null,
+                get userAgentApplication() {
+                    if (!this._userAgentApplication) {
+                        this._userAgentApplication = new Msal.UserAgentApplication(config.clientID, null, null);
+                    }
+                    return this._userAgentApplication;
+                },
+                set userAgentApplication(val) {
+                    this._userAgentApplication = val;
+                },
+                isAuthenticated: function () {
+                    return this.userAgentApplication.getUser() != null;
+                },
+                // Sign in the user and get user profile
                 login: function login() {
-                    return authenticationHandler.loginAndGetAccessToken(config.graphScopes)
+                    return this.userAgentApplication.loginPopup(config.graphScopes)
+                        .then(function (idToken) {
+                            return this.userAgentApplication.acquireTokenSilent(config.graphScopes);
+                        }.bind(this))
                         .then(this.meInternal.bind(this));
                 },
                 logout: function logout() {
-                    authenticationHandler.userAgentApplication.logout();
+                    this.userAgentApplication.logout();
                     delete localStorage.token;
                     delete localStorage.user;
                 },
@@ -39,20 +55,22 @@
 
                 // Get the profile of the current user.
                 me: function me() {
-                    return authenticationHandler.getAccessTokenViaPopup(config.graphScopes).then(this.meInternal.bind(this));
+                    return this.userAgentApplication.acquireTokenSilent(config.graphScopes)
+                        .then(this.meInternal.bind(this));
                 },
 
                 // Send an email on behalf of the current user.
                 sendMail: function sendMail(email) {
-                    // Initialize the auth request.
-                    // localStorage.user = userAgentApplication.user;
-                    authenticationHandler.getAccessTokenViaPopup(config.graphScopes).then(function (token) {
-                        setDefaultHeaders(token);
+                    return this.userAgentApplication.acquireTokenSilent(config.graphScopes)
+                        .then(function (token) {
+                            this.setDefaultHeaders(token);
 
-                        return $http.post('https://graph.microsoft.com/v1.0/me/sendMail',
-                            { 'message': email, 'saveToSentItems': true });
-                    });
+                            return $http.post('https://graph.microsoft.com/v1.0/me/sendMail',
+                                { 'message': email, 'saveToSentItems': true });
+                        }.bind(this));
                 }
             }
+
+            return factory;
         }]);
 })();
